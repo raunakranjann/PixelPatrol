@@ -1,0 +1,24 @@
+# 1. Maven Build Folder (Huge - Never commit this)
+target/
+
+# 2. Local IDE Settings
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 3. PixelPatrol Local Data (Database & Logs)
+# We don't want to commit your personal test screenshots or DB
+data.db
+pixelpatrol.log
+*.log
+
+# 4. Browsers (If you downloaded them locally)
+browsers/
+browsers_dist/
+dist
+
+# 5. OS Generated
+.classpath
+.project
+.settings/
