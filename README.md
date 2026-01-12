@@ -2,7 +2,7 @@
 
 > **Automated UI Testing for Developers.** > PixelPatrol is a self-hosted, offline-capable tool that detects "silent" UI regressions by comparing screenshots of your Staging vs. Production environments.
 
-![PixelPatrol Dashboard](https://via.placeholder.com/800x400?text=Dashboard+Preview+Here)
+![PixelPatrol Dashboard](https://github.com/user-attachments/assets/eef5f276-ad13-47b1-bcce-28457bdc0d19)
 
 ## 🚀 Why PixelPatrol?
 Visual bugs (e.g., a button moving 5px, a font changing) are hard to catch with standard unit tests. PixelPatrol automates this:
