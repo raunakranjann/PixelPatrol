@@ -1,5 +1,6 @@
 package com.example.pixelpatrol.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -14,6 +15,13 @@ public class Project {
     private String stagingUrl;
     private String productionUrl;
 
+
+    // --- NEW RELATIONSHIP ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "collection_id")
+    @JsonIgnore // Prevent infinite loops in JSON
+    private Collection collection;
+
     // Standard Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -23,4 +31,8 @@ public class Project {
     public void setStagingUrl(String stagingUrl) { this.stagingUrl = stagingUrl; }
     public String getProductionUrl() { return productionUrl; }
     public void setProductionUrl(String productionUrl) { this.productionUrl = productionUrl; }
+
+
+    public Collection getCollection() { return collection; }
+    public void setCollection(Collection collection) { this.collection = collection; }
 }

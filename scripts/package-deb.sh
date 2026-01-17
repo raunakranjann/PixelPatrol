@@ -2,7 +2,7 @@
 
 # 1. SETUP VARIABLES
 APP_NAME="pixelpatrol"
-APP_VERSION="1.0.1"
+APP_VERSION="1.1.1"
 MAIN_JAR="pixelpatrol.jar"
 INPUT_DIR="target"
 OUTPUT_DIR="dist"
