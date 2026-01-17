@@ -23,6 +23,7 @@ public class PlaywrightService {
     private Browser browser;
 
     public PlaywrightService() {
+        // Ensure screenshot directory exists
         new File(STORAGE_DIR).mkdirs();
     }
 
@@ -31,9 +32,10 @@ public class PlaywrightService {
         System.out.println("Booting up PixelPatrol Browser Engine...");
         playwright = Playwright.create(getCreateOptions());
 
+        // Launch Chromium once and keep it open
         browser = playwright.chromium().launch(new BrowserType.LaunchOptions()
                 .setHeadless(true)
-                .setArgs(List.of("--no-sandbox", "--disable-gpu"))); // Linux safety flags
+                .setArgs(List.of("--no-sandbox", "--disable-gpu")));
 
         System.out.println("Browser Engine Ready & Standing By!");
     }
@@ -65,38 +67,56 @@ public class PlaywrightService {
         return options;
     }
 
-    public Path[] captureScreenshots(Long projectId, String stagingUrl, String prodUrl) {
+    /**
+     * SYNCHRONIZED CAPTURE
+     * Adding 'synchronized' prevents the '__adopt__' error by ensuring
+     * only one test uses the Browser instance at a time.
+     */
+    public synchronized Path[] captureScreenshots(Long projectId, String stagingUrl, String prodUrl) {
         // Create context (Lightweight tab)
         try (BrowserContext context = browser.newContext(new Browser.NewContextOptions().setViewportSize(1920, 1080))) {
 
-            Page page = context.newPage();
-            // 30s Total Timeout per page (fail fast if stuck)
-            page.setDefaultNavigationTimeout(30000);
+            // Set global timeout
+            context.setDefaultNavigationTimeout(30000);
 
             Path stagingPath = Paths.get(STORAGE_DIR + "project_" + projectId + "_staging.png");
             Path prodPath = Paths.get(STORAGE_DIR + "project_" + projectId + "_prod.png");
 
-            // Capture with Retry
-            captureWithRetry(page, stagingUrl, stagingPath);
-            captureWithRetry(page, prodUrl, prodPath);
+            // Pass 'context' so we can create FRESH pages for retries
+            captureWithRetry(context, stagingUrl, stagingPath);
+            captureWithRetry(context, prodUrl, prodPath);
 
             return new Path[]{stagingPath, prodPath};
         }
     }
 
-    // NEW: Wrapper to handle retries
-    private void captureWithRetry(Page page, String url, Path outputPath) {
-        int maxRetries = 1; // Try once, then retry once
+    // NEW STRATEGY: Create a fresh page for every attempt
+    private void captureWithRetry(BrowserContext context, String url, Path outputPath) {
+        int maxRetries = 1;
+
         for (int i = 0; i <= maxRetries; i++) {
+            Page page = null;
             try {
+                // 1. Open a FRESH Page for this attempt
+                page = context.newPage();
+
+                // 2. Try Capture
                 capture(page, url, outputPath);
-                return; // Success! Exit loop
+
+                // 3. Success! Close page and return
+                page.close();
+                return;
+
             } catch (Exception e) {
-                System.err.println("⚠️ Attempt " + (i + 1) + " failed for " + url + ": " + e.getMessage());
+                System.err.println("Attempt " + (i + 1) + " failed for " + url + ": " + e.getMessage());
+
+                // Close the failed page immediately to clean up state
+                if (page != null) {
+                    try { page.close(); } catch (Exception ignored) {}
+                }
 
                 if (i == maxRetries) {
-                    // Final Failure: Throw it up to the controller
-                    throw new RuntimeException("Failed to reach " + url + " after retries. Reason: " + e.getMessage());
+                    throw new RuntimeException("Failed to reach " + url + ". Reason: " + e.getMessage());
                 }
 
                 // Wait 1s before retrying
@@ -108,15 +128,13 @@ public class PlaywrightService {
     private void capture(Page page, String url, Path outputPath) {
         System.out.println("Navigating to: " + url);
 
-        // Navigate
         page.navigate(url);
 
         if ("about:blank".equals(page.url())) {
             throw new RuntimeException("Page failed to load (Blank Page).");
         }
 
-        // *** SMART WAIT STRATEGY ***
-        // Try NETWORKIDLE for best quality, but don't crash if it timeouts.
+        // Smart Wait: Try Network Idle, but don't crash if it times out
         try {
             page.waitForLoadState(LoadState.NETWORKIDLE, new Page.WaitForLoadStateOptions().setTimeout(10000));
         } catch (TimeoutError e) {

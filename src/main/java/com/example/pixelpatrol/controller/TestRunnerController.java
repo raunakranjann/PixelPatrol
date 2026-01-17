@@ -49,7 +49,9 @@ public class TestRunnerController {
 
             // B. Compare
             ComparisonService.DiffResult result = comparisonService.compareAndGetDiff(images[0], images[1]);
-            boolean isMatch = (result.diffPath == null);
+
+            // Match only if path is null AND percentage is strictly 0
+            boolean isMatch = (result.diffPath == null && result.diffPercent == 0.0);
             String diffFileName = isMatch ? "" : result.diffPath.getFileName().toString();
 
             // C. Return JSON

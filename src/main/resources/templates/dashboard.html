@@ -68,7 +68,6 @@
                     Save Monitor
                 </button>
             </form>
-
             <div class="mt-8 pt-6 border-t border-dashed">
                 <p class="text-xs text-gray-400 text-center">PixelPatrol v1.0 <br> Local Environment</p>
             </div>
@@ -87,7 +86,7 @@
 
                 <div class="flex gap-3 items-center transition">
 
-                    <button th:id="'btn-col-report-' + ${col.id}" class="hidden text-green-600 hover:text-green-800 text-xs font-bold uppercase flex items-center gap-1 transition mr-2 border border-green-200 bg-green-50 px-2 py-1 rounded" title="Download Report">
+                    <button th:id="'btn-col-report-' + ${col.id}" class="hidden text-green-600 hover:text-green-800 text-xs font-bold uppercase flex items-center gap-1 transition mr-2 border border-green-200 bg-green-50 px-2 py-1 rounded shadow-sm" title="Download Report">
                         <i class="fas fa-file-pdf"></i> PDF
                     </button>
 
@@ -107,7 +106,7 @@
                 <div th:each="project : ${col.projects}" class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition hover:border-indigo-300 relative group">
                     <div class="flex justify-between items-start mb-3">
                         <div class="overflow-hidden">
-                            <h4 class="font-bold text-gray-800 text-sm truncate" th:text="${project.name}" th:title="${project.name}">Name</h4>
+                            <h4 class="font-bold text-gray-800 text-sm truncate" th:text="${project.name}">Name</h4>
                             <div class="text-[10px] text-gray-400 mt-1 space-y-0.5 font-mono">
                                 <p class="truncate"><i class="fas fa-server w-3"></i> <span th:text="${project.stagingUrl}"></span></p>
                                 <p class="truncate"><i class="fas fa-globe w-3"></i> <span th:text="${project.productionUrl}"></span></p>
@@ -220,74 +219,104 @@
 </div>
 
 <script>
-    // --- RESULT PANEL LOGIC ---
+    // --- UTILS ---
     function openResult() { document.getElementById('result-panel').classList.remove('translate-x-full'); }
     function closeResult() { document.getElementById('result-panel').classList.add('translate-x-full'); }
     function openModal(src) { if(!src) return; document.getElementById('modal-img').src = src; document.getElementById('image-modal').classList.remove('hidden'); }
     function closeModal() { document.getElementById('image-modal').classList.add('hidden'); }
     document.addEventListener('keydown', (e) => { if(e.key === "Escape") { closeModal(); closeResult(); }});
 
+    // --- BUTTON STATUS UPDATER (ROBUST FIX) ---
+    function updateButtonStatus(id, data) {
+        const btn = document.getElementById('btn-run-' + id);
+        const badge = document.getElementById('badge-' + id);
+        if(!btn || !badge) return;
+
+        // Reset All Classes (Start fresh)
+        btn.className = "flex-1 text-xs font-bold py-1.5 rounded transition flex justify-center items-center gap-2 border";
+        badge.className = "hidden px-1.5 py-0.5 text-[10px] font-bold uppercase rounded border ml-2 shrink-0";
+        badge.classList.add('hidden');
+
+        if (data.status === 'PASS') {
+            btn.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+            btn.innerHTML = "Passed";
+            badge.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+            badge.classList.remove('hidden');
+            badge.innerText = "0% DIFF";
+        } else if (data.status === 'FAIL') {
+            btn.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+            btn.innerHTML = "Failed";
+            badge.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
+            badge.classList.remove('hidden');
+            badge.innerText = data.diffPercent + "% DIFF";
+        } else {
+            // ERROR STATE
+            btn.classList.add('bg-orange-100', 'text-orange-600', 'border-orange-200');
+            btn.innerHTML = "Error";
+            // No badge for errors
+        }
+    }
+
+    // --- LOADING STATE HELPER ---
+    function setButtonLoading(id) {
+        const btn = document.getElementById('btn-run-' + id);
+        const badge = document.getElementById('badge-' + id);
+        if(btn) {
+            btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+            btn.className = "flex-1 bg-gray-100 text-gray-500 border border-gray-200 text-xs font-bold py-1.5 rounded transition flex justify-center items-center gap-2";
+        }
+        if(badge) badge.classList.add('hidden');
+    }
+
     // --- RUN SINGLE TEST ---
     async function runTest(btn) {
         const id = btn.getAttribute('data-id');
-        const badge = document.getElementById('badge-' + id);
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
-        btn.disabled = true;
-        badge.classList.add('hidden');
+        setButtonLoading(id);
+
+        // Setup Result Panel
         openResult();
         document.getElementById('result-images').classList.add('hidden');
         document.getElementById('result-icon').innerHTML = '<i class="fas fa-circle-notch fa-spin text-indigo-500"></i>';
         document.getElementById('result-title').innerText = "Running Test...";
         document.getElementById('result-desc').innerText = "Comparing pixels between environments...";
         document.getElementById('pdf-btn').classList.add('hidden');
+
         try {
             const res = await fetch('/api/run-test/' + id, {method: 'POST'});
             const data = await res.json();
-            const ts = new Date().getTime();
-            document.getElementById('img-staging').src = "/api/images/" + data.stagingImg + "?t=" + ts;
-            document.getElementById('img-prod').src = "/api/images/" + data.prodImg + "?t=" + ts;
-            document.getElementById('result-images').classList.remove('hidden');
-            const pdfBtn = document.getElementById('pdf-btn');
-            pdfBtn.classList.remove('hidden');
-            pdfBtn.onclick = () => window.open(data.reportUrl, '_blank');
-            const icon = document.getElementById('result-icon');
-            const title = document.getElementById('result-title');
-            const desc = document.getElementById('result-desc');
-            btn.classList.remove('bg-gray-50', 'text-gray-600');
+
+            // Update UI Button with correct color
+            updateButtonStatus(id, data);
+
+            // Update Result Panel
             if (data.status === 'ERROR') {
-                icon.innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500"></i>';
-                title.innerText = "Error";
-                desc.innerText = data.message;
-                btn.className = "flex-1 bg-orange-50 text-orange-600 text-xs font-bold py-1.5 rounded border border-orange-200";
-                btn.innerHTML = "Error";
-            } else if (data.status === 'PASS') {
-                icon.innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
-                title.innerText = "Passed";
-                desc.innerText = "✅ Zero visual differences detected.";
-                btn.className = "flex-1 bg-green-50 text-green-700 text-xs font-bold py-1.5 rounded border border-green-200";
-                btn.innerHTML = "Passed";
-                badge.className = "px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-green-100 text-green-700 border border-green-200";
-                badge.innerText = "0% DIFF";
-                badge.classList.remove('hidden');
+                document.getElementById('result-icon').innerHTML = '<i class="fas fa-exclamation-triangle text-orange-500"></i>';
+                document.getElementById('result-title').innerText = "Error";
+                document.getElementById('result-desc').innerText = data.message;
             } else {
-                icon.innerHTML = '<i class="fas fa-bug text-red-500"></i>';
-                title.innerText = "Regression Found";
-                desc.innerText = `❌ ${data.diffPercent}% difference detected.`;
-                btn.className = "flex-1 bg-red-50 text-red-700 text-xs font-bold py-1.5 rounded border border-red-200";
-                btn.innerHTML = "Failed";
-                badge.className = "px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-red-100 text-red-700 border border-red-200";
-                badge.innerText = `${data.diffPercent}% DIFF`;
-                badge.classList.remove('hidden');
+                const ts = new Date().getTime();
+                document.getElementById('img-staging').src = "/api/images/" + data.stagingImg + "?t=" + ts;
+                document.getElementById('img-prod').src = "/api/images/" + data.prodImg + "?t=" + ts;
+                document.getElementById('result-images').classList.remove('hidden');
+
+                const pdfBtn = document.getElementById('pdf-btn');
+                pdfBtn.classList.remove('hidden');
+                pdfBtn.onclick = () => window.open(data.reportUrl, '_blank');
+
+                if (data.status === 'PASS') {
+                    document.getElementById('result-icon').innerHTML = '<i class="fas fa-check-circle text-green-500"></i>';
+                    document.getElementById('result-title').innerText = "Passed";
+                    document.getElementById('result-desc').innerText = "✅ Zero visual differences.";
+                } else {
+                    document.getElementById('result-icon').innerHTML = '<i class="fas fa-bug text-red-500"></i>';
+                    document.getElementById('result-title').innerText = "Regression";
+                    document.getElementById('result-desc').innerText = `❌ ${data.diffPercent}% difference detected.`;
+                }
             }
         } catch (e) {
-            console.error(e);
+            updateButtonStatus(id, {status: 'ERROR'});
             document.getElementById('result-title').innerText = "System Error";
-            document.getElementById('result-desc').innerText = "Check backend logs.";
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-        } finally {
-            if(!btn.innerHTML.includes("Error")) setTimeout(() => btn.disabled = false, 500);
+            document.getElementById('result-desc').innerText = "Check logs.";
         }
     }
 
@@ -296,41 +325,47 @@
         const container = document.getElementById('col-group-' + collectionId);
         const buttons = container.querySelectorAll('[id^="btn-run-"]');
         const projectIds = Array.from(buttons).map(b => b.getAttribute('data-id'));
-        if (projectIds.length === 0) {
-            alert("This collection is empty!");
-            return;
-        }
+
+        if (projectIds.length === 0) { alert("Empty collection!"); return; }
+
+        // Open Modal
         const modal = document.getElementById('progress-modal');
         const bar = document.getElementById('progress-bar');
         const text = document.getElementById('progress-text');
         const detail = document.getElementById('progress-detail');
-
         modal.classList.remove('hidden');
+
+        // Reset all buttons in this collection to "Loading"
+        projectIds.forEach(id => setButtonLoading(id));
+
         let completed = 0;
         const total = projectIds.length;
+
         for (const id of projectIds) {
-            const percent = Math.round((completed / total) * 100);
-            bar.style.width = percent + "%";
-            text.innerText = `Collection Progress: ${completed + 1}/${total}`;
+            bar.style.width = Math.round((completed / total) * 100) + "%";
+            text.innerText = `Progress: ${completed + 1}/${total}`;
             detail.innerText = `Analyzing Project ID: ${id}...`;
+
             try {
                 const res = await fetch('/api/run-test/' + id, { method: 'POST' });
                 const data = await res.json();
                 updateButtonStatus(id, data);
             } catch (e) {
-                console.error("Failed project " + id, e);
+                console.error("Failed", e);
                 updateButtonStatus(id, {status: 'ERROR'});
             }
             completed++;
         }
+
+        // Generate Report
         bar.style.width = "100%";
         text.innerText = "Generating PDF...";
-        detail.innerText = "Building collection report...";
+
         try {
             const reportRes = await fetch('/api/generate-report/collection/' + collectionId, { method: 'POST' });
             const reportData = await reportRes.json();
 
-            // SHOW THE DOWNLOAD BUTTON
+            // Reveal PDF Button
             const downloadBtn = document.getElementById('btn-col-report-' + collectionId);
             if(downloadBtn) {
                 downloadBtn.classList.remove('hidden');
@@ -342,7 +377,7 @@
                 window.open(reportData.reportUrl, '_blank');
             }, 800);
         } catch (e) {
-            alert("Tests finished, but report generation failed.");
+            alert("Report failed.");
             modal.classList.add('hidden');
         }
     }
@@ -351,77 +386,54 @@
     async function runBatch() {
         const buttons = document.querySelectorAll('[id^="btn-run-"]');
         const projectIds = Array.from(buttons).map(b => b.getAttribute('data-id'));
-        if (projectIds.length === 0) {
-            alert("No monitors found!");
-            return;
-        }
+        if (projectIds.length === 0) return;
+
         const modal = document.getElementById('progress-modal');
         const bar = document.getElementById('progress-bar');
         const text = document.getElementById('progress-text');
         const detail = document.getElementById('progress-detail');
         const mainBtn = document.getElementById('btn-batch');
+
         modal.classList.remove('hidden');
         mainBtn.disabled = true;
+
+        projectIds.forEach(id => setButtonLoading(id));
+
         let completed = 0;
         const total = projectIds.length;
+
         for (const id of projectIds) {
-            const percent = Math.round((completed / total) * 100);
-            bar.style.width = percent + "%";
-            text.innerText = `Processing ${completed + 1} of ${total}`;
-            detail.innerText = `Analyzing Project ID: ${id}...`;
+            bar.style.width = Math.round((completed / total) * 100) + "%";
+            text.innerText = `Batch Progress: ${completed + 1}/${total}`;
+            detail.innerText = `Analyzing ID: ${id}...`;
+
             try {
                 const res = await fetch('/api/run-test/' + id, { method: 'POST' });
                 const data = await res.json();
                 updateButtonStatus(id, data);
             } catch (e) {
-                console.error("Failed project " + id, e);
                 updateButtonStatus(id, {status: 'ERROR'});
             }
             completed++;
         }
+
         bar.style.width = "100%";
         text.innerText = "Compiling Report...";
-        detail.innerText = "Stitching PDF together...";
+
         try {
             const reportRes = await fetch('/api/generate-full-report', { method: 'POST' });
             const reportData = await reportRes.json();
             setTimeout(() => {
                 modal.classList.add('hidden');
-                mainBtn.className = "bg-green-600 text-white hover:bg-green-700 text-sm font-bold py-1 px-4 rounded shadow transition flex items-center gap-2";
                 mainBtn.innerHTML = '<i class="fas fa-file-download"></i> Download Report';
                 mainBtn.onclick = () => window.open(reportData.reportUrl, '_blank');
                 mainBtn.disabled = false;
                 window.open(reportData.reportUrl, '_blank');
             }, 800);
         } catch (e) {
-            alert("Tests finished, but report generation failed.");
+            alert("Report failed.");
             modal.classList.add('hidden');
             mainBtn.disabled = false;
-        }
-    }
-
-    // Helper
-    function updateButtonStatus(id, data) {
-        const btn = document.getElementById('btn-run-' + id);
-        const badge = document.getElementById('badge-' + id);
-        if(!btn) return;
-        btn.classList.remove('bg-gray-50', 'text-gray-600', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-orange-100', 'text-orange-600');
-        badge.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700');
-        if (data.status === 'PASS') {
-            btn.classList.add('bg-green-100', 'text-green-700');
-            btn.innerHTML = "Passed";
-            badge.className = "px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-green-100 text-green-700 border border-green-200";
-            badge.innerText = "0% DIFF";
-            badge.classList.remove('hidden');
-        } else if (data.status === 'FAIL') {
-            btn.classList.add('bg-red-100', 'text-red-700');
-            btn.innerHTML = "Failed";
-            badge.className = "px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-red-100 text-red-700 border border-red-200";
-            badge.innerText = data.diffPercent + "% DIFF";
-            badge.classList.remove('hidden');
-        } else {
-            btn.classList.add('bg-orange-100', 'text-orange-600');
-            btn.innerHTML = "Error";
         }
     }
 </script>
