@@ -1,5 +1,5 @@
 ## PixelPatrol (Visual Regression Testing Tool) 
-[![Download for Ubuntu](https://img.shields.io/badge/Download-PixelPatrol_1.2.5_(.deb)-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](pixelpatrol_1.0.1_amd64.deb)
+[![Download for Ubuntu](https://img.shields.io/badge/Download-PixelPatrol_v1.2.5_(.deb)-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)](https://github.com/raunakranjann/PixelPatrol/releases/download/v1.2.5/pixelpatrol_1.2.5_amd64.deb)
 ---
 Automated UI Testing for Developers.
 PixelPatrol is a self-hosted, privacy-first tool that detects "silent" UI regressions by comparing screenshots of your Staging vs. Production environments pixel-by-pixel.
