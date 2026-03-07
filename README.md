@@ -13,11 +13,7 @@ Developed at Siwan College of Engineering and Management.
 
 The Team:
 
-Raunak Ranjan + Osama Shakil - Research & Project Planning
-
-Raunak Ranjan - Lead Developer & Architect
-
-Osama Shakil - QA Lead & Validation
+Raunak Ranjan - Research & Project Planning, Lead Developer & Architect, QA Lead & Validation
 
 
 
